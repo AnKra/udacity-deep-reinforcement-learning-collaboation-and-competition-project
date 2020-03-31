@@ -16,7 +16,7 @@ class Agent():
 
     def __init__(self, state_size, action_size, num_agents, seed, batch_size,
                  buffer_size=int(1e6), gamma=0.99, tau=1e-3, lr_actor=6e-4,
-                 lr_critic=6e-4, weight_decay=0, update_every=20, n_update_networks=10):
+                 lr_critic=6e-4, weight_decay=0, update_every=1, n_update_networks=1):
         """Initialize an Agent object.
 
         Params
