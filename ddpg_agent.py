@@ -17,16 +17,17 @@ class Agent():
 
     def __init__(self, state_size, action_size, num_agents, seed, batch_size,
                  buffer_size=int(1e6), gamma=0.99, tau=1e-3, lr_actor=4e-4,
-                 lr_critic=4e-4, weight_decay=0, update_every=1, n_update_networks=1):
+                 lr_critic=4e-4, weight_decay=0):
         """Initialize an Agent object.
 
         Params
         ======
             state_size (int): dimension of each state
             action_size (int): dimension of each action
+            num_agents (int): number of agents
             seed (int): random seed
-            buffer_size (int): replay buffer size
             batch_size (int): minibatch size
+            buffer_size (int): replay buffer size
             gamma (float): discount factor
             tau (float): for soft update of target parameters
             lr_actor (float): learning rate of the actor
@@ -42,14 +43,18 @@ class Agent():
         self.tau = tau
 
         # Actor Network (w/ Target Network)
-        self.actor_local = Actor(state_size, action_size, seed).to(device)
-        self.actor_target = Actor(state_size, action_size, seed).to(device)
+        self.actor_local = Actor(state_size, action_size, seed, use_batch_norm_layers=False).to(device)
+        self.actor_target = Actor(state_size, action_size, seed, use_batch_norm_layers=False).to(device)
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_actor)
+
+        print(self.actor_local)
 
         # Critic Network (w/ Target Network)
         self.critic_local = Critic(state_size, action_size, seed).to(device)
         self.critic_target = Critic(state_size, action_size, seed).to(device)
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=lr_critic, weight_decay=weight_decay)
+
+        print(self.critic_local)
 
         # Noise process
         self.noise = OUNoise(action_size, seed)
@@ -57,22 +62,19 @@ class Agent():
         # Replay memory
         self.memory = ReplayBuffer(action_size, buffer_size, batch_size, seed)
 
-        self.update_every = update_every
-        self.n_update_networks = n_update_networks
-        self.step_count = 0
-
-    def step(self, states, actions, rewards, next_states, dones):
-        """Save experience in replay memory, and use random sample from buffer to learn."""
+    def add_experience(self, states, actions, rewards, next_states, dones):
+        """Save experience in replay memory."""
         # Save experience / reward
         self.memory.add(states, actions, rewards, next_states, dones)
 
+    def get_sample(self):
+        """Use random sample from buffer to learn."""
         # Learn every time step.
         # Learn, if enough samples are available in memory
-        self.step_count += 1
-        if len(self.memory) > self.batch_size and self.step_count % self.update_every == 0:
-            for i in range(self.n_update_networks):
-                experiences = self.memory.sample()
-                self.learn(experiences, self.gamma, self.tau)
+        if len(self.memory) >= self.batch_size:
+            return self.memory.sample()
+        else:
+            return None
 
     def act(self, states, add_noise=True):
         """Returns actions for given state as per current policy."""
@@ -88,7 +90,7 @@ class Agent():
     def reset(self):
         self.noise.reset()
 
-    def learn(self, experiences, gamma, tau):
+    def learn(self, self_experiences, others_experiences, gamma, tau):
         """Update policy and value parameters using given batch of experience tuples.
         Q_targets = r + γ * critic_target(next_state, actor_target(next_state))
         where:
@@ -99,16 +101,17 @@ class Agent():
             experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
             gamma (float): discount factor
         """
-        states, actions, rewards, next_states, dones = experiences
+        states, actions, rewards, next_states, dones = self_experiences
+        states_n, actions_n, _, next_states_n, n_dones = others_experiences
 
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models
-        actions_next = self.actor_target(next_states)
-        Q_targets_next = self.critic_target(next_states, actions_next)
+        actions_next_n = self.actor_target(next_states_n)
+        Q_targets_next = self.critic_target(next_states_n, actions_next_n)
         # Compute Q targets for current states (y_i)
-        Q_targets = rewards + (gamma * Q_targets_next.view(-1, self.num_agents) * (1 - dones))
+        Q_targets = rewards + (gamma * Q_targets_next.view(-1, self.num_agents)) * (1 - n_dones.view(-1, self.num_agents))
         # Compute critic loss
-        Q_expected = self.critic_local(states, actions)
+        Q_expected = self.critic_local(states_n, actions_n)  # TODO incompatible shapes???
         critic_loss = F.mse_loss(Q_expected.view(-1, self.num_agents), Q_targets)
         # Minimize the loss
         self.critic_optimizer.zero_grad()

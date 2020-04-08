@@ -12,7 +12,7 @@ def hidden_init(layer):
 class Actor(nn.Module):
     """Actor (Policy) Model."""
 
-    def __init__(self, state_size, action_size, seed, fc1_units=64, fc2_units=128):
+    def __init__(self, state_size, action_size, seed, fc1_units=64, fc2_units=128, use_batch_norm_layers=True):
         """Initialize parameters and build model.
         Params
         ======
@@ -24,13 +24,15 @@ class Actor(nn.Module):
         """
         super(Actor, self).__init__()
         self.seed = torch.manual_seed(seed)
+        self.use_batch_norm_layers = use_batch_norm_layers
 
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
         self.fc3 = nn.Linear(fc2_units, action_size)
 
-        self.bn1 = nn.BatchNorm1d(fc1_units)
-        self.bn2 = nn.BatchNorm1d(fc2_units)
+        if use_batch_norm_layers:
+            self.bn1 = nn.BatchNorm1d(fc1_units)
+            self.bn2 = nn.BatchNorm1d(fc2_units)
 
         self.reset_parameters()
 
@@ -39,10 +41,30 @@ class Actor(nn.Module):
         self.fc2.weight.data.uniform_(*hidden_init(self.fc2))
         self.fc3.weight.data.uniform_(-3e-3, 3e-3)
 
-    def forward(self, state):
+    def forward(self, x):
         """Build an actor (policy) network that maps states -> actions."""
-        x = self.bn1(F.relu(self.fc1(state)))
-        x = self.bn2(F.relu(self.fc2(x)))
+
+        do_print = False
+
+        if do_print:
+            print(x.shape)
+
+        x = F.relu(self.fc1(x))
+
+        if do_print:
+            print(x.shape)
+
+        if self.use_batch_norm_layers:
+            x = self.bn1(x)
+
+        if do_print:
+            print(x.shape)
+
+        x = F.relu(self.fc2(x))
+
+        if self.use_batch_norm_layers:
+            x = self.bn2(x)
+
         return F.tanh(self.fc3(x))
 
 
