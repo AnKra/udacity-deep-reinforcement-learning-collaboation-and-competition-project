@@ -16,15 +16,19 @@ In contrast to the critic, the actor receives only local information (i.e. its o
 
 # Project 3 - Collaboration and Competition
 
-## Learning Algorithm
+## DDPG
+
+### Learning Algorithm
 The DDPG agent with which I solved Project 2 "Continuous Control" also works well for the tennis environment. I achieved an average score over the last 100 episodes of 1.75 in less than 1200 episodes with exactly the same parameter set.
 
 I tuned the parameters by reducing the size of the fully connected layers by half and reducing the learning rate to 4e-4. Moreover I update the (local) actor and critic networks only once at a time (instead of 20 times in a row), using one sample (instead of 10 samples) from the replay buffer. With those changes the agent learns in a stable manner and achieves an average score of 2.16 over the last 100 episodes.
 
-## Model Architecture
+### Model Architecture
 The primary actor network and the target actor network have identical architectures. The same is true for the primary critic network and the target critic network.
 
-### Actor
+There is one agents which receives the observations of both agents as input.
+
+#### Actor
 ```
 Actor(
   (fc1): Linear(in_features=24, out_features=64, bias=True)
@@ -42,7 +46,7 @@ def forward(self, state):
     return x
 ```
 
-### Critic
+#### Critic
 ```
 Critic(
   (fcs1): Linear(in_features=24, out_features=256, bias=True)
@@ -59,10 +63,45 @@ def forward(self, state, action):
     return x
 ```
 
-## Result
+### Result
 The agents achieve an average score of 2 (over 100 consecutive episodes, and over both agents) in less than 1300 episodes.
 
-<img src="images/result.png" width="80%" alt="" title="Score" />
+<img src="images/result-ddpg.png" width="80%" alt="" title="Score" />
+
+## MADDPG
+
+### Learning Algorithm
+The learning algorithm is based on the [MADDPG paper](https://arxiv.org/pdf/1706.02275.pdf). I instantiate two DDPG agents which receive observations from a central replay buffer.
+
+The learning process is more instable than in the first approach due to the changing environment. To increase stability, in every step the Agent class takes 5 states, actions, rewards, next states and dones as input (one per agent) and outputs 5 actions. The side-effect of this setting is that one agent is able to have a lead over the other one and wins a match more often.
+
+This approach seems to be very specific about a well-chosen learning rate. I tried to vary the learning rate slightly which results in the agents not learning at all.
+
+### Model Architecture
+In contrast to the first approach, there are two separate agents. Each agents has its own primary and target actor and critic. The actors only receive their own observations as input. The critics receive the observations of both agents as input. As a consequence the critics have twice as many input features as in the first approach.
+
+#### Actor
+```
+Actor(
+  (fc1): Linear(in_features=24, out_features=64, bias=True)
+  (fc2): Linear(in_features=64, out_features=128, bias=True)
+  (fc3): Linear(in_features=128, out_features=2, bias=True)
+)
+```
+
+#### Critic
+```
+Critic(
+  (fcs1): Linear(in_features=48, out_features=256, bias=True)
+  (fc2): Linear(in_features=260, out_features=128, bias=True)
+  (fc3): Linear(in_features=128, out_features=1, bias=True)
+)
+```
+
+### Result
+The agents achieve an average score of 2 (over 100 consecutive episodes, and over both agents) in less than 2100 episodes.
+
+<img src="images/result-maddpg.png" width="80%" alt="" title="Score" />
 
 ## Ideas for Improvement
 * find better hyperparameters in an automated way
