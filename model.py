@@ -43,22 +43,10 @@ class Actor(nn.Module):
 
     def forward(self, x):
         """Build an actor (policy) network that maps states -> actions."""
-
-        do_print = False
-
-        if do_print:
-            print(x.shape)
-
         x = F.relu(self.fc1(x))
-
-        if do_print:
-            print(x.shape)
 
         if self.use_batch_norm_layers:
             x = self.bn1(x)
-
-        if do_print:
-            print(x.shape)
 
         x = F.relu(self.fc2(x))
 

@@ -88,6 +88,14 @@ Actor(
   (fc3): Linear(in_features=128, out_features=2, bias=True)
 )
 ```
+```
+def forward(self, state):
+    x = F.relu(self.fc1(state))
+    x = F.relu(self.fc2(x))
+    x= F.tanh(self.fc3(x))
+    return x
+```
+
 
 #### Critic
 ```
@@ -96,6 +104,14 @@ Critic(
   (fc2): Linear(in_features=260, out_features=128, bias=True)
   (fc3): Linear(in_features=128, out_features=1, bias=True)
 )
+```
+```
+def forward(self, state, action):
+    xs = F.relu(self.fcs1(state))
+    x = torch.cat((xs, action), dim=1)
+    x = F.relu(self.fc2(x))
+    x = self.fc3(x)
+    return x
 ```
 
 ### Result

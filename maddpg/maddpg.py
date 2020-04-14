@@ -1,15 +1,10 @@
 import numpy as np
 import random
 
-from model import Actor, Critic
-
 import torch
-import torch.nn.functional as F
-import torch.optim as optim
 
-from ddpg_agent import Agent
-from ounoise import OUNoise
-from replay_buffer import ReplayBuffer
+from maddpg.ddpg_agent import Agent
+from maddpg.replay_buffer import ReplayBuffer
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
