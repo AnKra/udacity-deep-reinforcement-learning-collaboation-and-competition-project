@@ -33,10 +33,11 @@ class Agent():
             lr_critic (float): learning rate of the critic
             weight_decay (float): L2 weight decay
         """
+        random.seed(seed)
+
         self.state_size = state_size
         self.action_size = action_size
         self.num_agents = num_agents
-        self.seed = random.seed(seed)
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
