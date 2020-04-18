@@ -83,16 +83,11 @@ class Agent():
         """
         states_all, actions_all, rewards_all, next_states_all, dones_all, actions_next_target_all, actions_next_local_all = experiences
 
-        rewards_self = rewards_all[:,self.index]  # torch.Size([256])
-        states_self = states_all[:,self.index,:].view(-1, self.state_size)
-        states_all = states_all.view(-1, self.num_agents * self.state_size)
-        actions_all = actions_all.view(-1, self.num_agents * self.action_size)
-        next_states_all = next_states_all.view(-1, self.num_agents * self.state_size)
-        dones_self = dones_all[:,self.index]  # dones should be the same for every agent in one timestep  # torch.Size([256])
+        rewards_self = rewards_all[:,self.index]
+        states_self = states_all.view(-1, self.num_agents, self.state_size)[:,self.index,:]
+        dones_self = dones_all[:,self.index]  # dones should be the same for every agent in one timestep
         del dones_all
         del rewards_all
-        actions_next_target_all = actions_next_target_all.view(-1, self.num_agents * self.action_size)
-        actions_next_local_all = actions_next_local_all.view(-1, self.num_agents * self.action_size)
 
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models

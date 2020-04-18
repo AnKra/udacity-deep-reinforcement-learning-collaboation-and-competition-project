@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from ounoise import OUNoise
-from ddpg.replay_buffer import ReplayBuffer
+from replay_buffer import ReplayBuffer
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
