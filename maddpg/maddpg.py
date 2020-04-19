@@ -11,8 +11,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class MADDPG():
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, num_agents, seed, batch_size,
-                 update_every=5, n_update_networks=5):
+    def __init__(self, agents, seed, batch_size, update_every=5, n_update_networks=5):
         """Initialize an Agent object.
 
         Params
@@ -25,15 +24,11 @@ class MADDPG():
             update_every (int): after how many timesteps to update the network
             n_update_networks (int): how often to update the network in a row
         """
-        self.agents = []
-        self.num_agents = num_agents
-        for i in range(num_agents):
-            self.agents.append(Agent(state_size, action_size, num_agents, seed, batch_size, i))
+        self.num_agents = len(agents)
+        self.agents = agents
 
-        self.state_size = state_size
-        self.action_size = action_size
         self.batch_size = batch_size
-        self.memory = ReplayBuffer(action_size, buffer_size=int(1e6), batch_size=batch_size, seed=seed)
+        self.memory = ReplayBuffer(buffer_size=int(1e6), batch_size=batch_size, seed=seed)
 
         self.update_every = update_every
         self.n_update_networks = n_update_networks
@@ -41,9 +36,9 @@ class MADDPG():
 
     def step(self, states, actions, rewards, next_states, dones):
         # add new experience to every agent
-        states = states.reshape(-1, self.num_agents * self.state_size)
-        actions = actions.reshape(-1, self.num_agents * self.action_size)
-        next_states = next_states.reshape(-1, self.num_agents * self.state_size)
+        states = states.reshape(1, -1)
+        actions = actions.reshape(1, -1)
+        next_states = next_states.reshape(1, -1)
         self.memory.add(states, actions, rewards, next_states, dones)
 
         # check if enough samples available
@@ -63,19 +58,17 @@ class MADDPG():
                 states_all, _, _, _, _ = experiences
 
                 # add actions_next_target
-                actions_next_target_all = torch.Tensor()
-                actions_next_target_all = actions_next_target_all.to(device)
+                actions_next_target_all = torch.Tensor().to(device)
                 for i in range(self.num_agents):
-                    states_self = states_all.view(-1, self.num_agents, self.state_size)[:,i,:]
+                    states_self = states_all.view(self.batch_size, self.num_agents, -1)[:,i,:]
                     actions_next_self = self.agents[i].actor_target(states_self)
                     actions_next_target_all = torch.cat((actions_next_target_all, actions_next_self), dim=1)
                 experiences += (actions_next_target_all, )
 
                 # add actions_next_local
-                actions_next_local_all = torch.Tensor()
-                actions_next_local_all = actions_next_local_all.to(device)
+                actions_next_local_all = torch.Tensor().to(device)
                 for i in range(self.num_agents):
-                    states_self = states_all.view(-1, self.num_agents, self.state_size)[:,i,:]
+                    states_self = states_all.view(self.batch_size, self.num_agents, -1)[:,i,:]
                     actions_next_self = self.agents[i].actor_local(states_self)
                     actions_next_local_all = torch.cat((actions_next_local_all, actions_next_self), dim=1)
                 experiences += (actions_next_local_all, )

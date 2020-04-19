@@ -56,7 +56,7 @@ class Agent():
         self.noise = OUNoise(action_size, seed)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, buffer_size, batch_size, seed)
+        self.memory = ReplayBuffer(buffer_size, batch_size, seed)
 
         self.update_every = update_every
         self.n_update_networks = n_update_networks
