@@ -24,8 +24,10 @@ class MADDPG():
             update_every (int): after how many timesteps to update the network
             n_update_networks (int): how often to update the network in a row
         """
-        self.num_agents = len(agents)
         self.agents = agents
+        self.num_all_agents = 0
+        for agent in agents:
+            self.num_all_agents += agent.num_agents
 
         self.batch_size = batch_size
         self.memory = ReplayBuffer(buffer_size=int(1e6), batch_size=batch_size, seed=seed)
@@ -34,12 +36,13 @@ class MADDPG():
         self.n_update_networks = n_update_networks
         self.step_count = 0
 
-    def step(self, states, actions, rewards, next_states, dones):
+    def step(self, states, actions, rewards, next_states, done, discretize_actions=False):
         # add new experience to every agent
         states = states.reshape(1, -1)
         actions = actions.reshape(1, -1)
+        rewards = rewards.reshape(1, -1)
         next_states = next_states.reshape(1, -1)
-        self.memory.add(states, actions, rewards, next_states, dones)
+        self.memory.add(states, actions, rewards, next_states, done)
 
         # check if enough samples available
         if len(self.memory) < self.batch_size:
@@ -50,6 +53,7 @@ class MADDPG():
             return
 
         for i in range(self.n_update_networks):
+            agent_index = 0
             for agent in self.agents:
                 # get experiences
                 experiences = self.memory.sample()
@@ -58,29 +62,57 @@ class MADDPG():
                 states_all, _, _, _, _ = experiences
 
                 # add actions_next_target
-                actions_next_target_all = torch.Tensor().to(device)
-                for i in range(self.num_agents):
-                    states_self = states_all.view(self.batch_size, self.num_agents, -1)[:,i,:]
-                    actions_next_self = self.agents[i].actor_target(states_self)
-                    actions_next_target_all = torch.cat((actions_next_target_all, actions_next_self), dim=1)
+                actions_next_target_all = self.get_actions_next_target_all(states_all, discretize_actions)
                 experiences += (actions_next_target_all, )
 
                 # add actions_next_local
-                actions_next_local_all = torch.Tensor().to(device)
-                for i in range(self.num_agents):
-                    states_self = states_all.view(self.batch_size, self.num_agents, -1)[:,i,:]
-                    actions_next_self = self.agents[i].actor_local(states_self)
-                    actions_next_local_all = torch.cat((actions_next_local_all, actions_next_self), dim=1)
+                actions_next_local_all = self.get_actions_next_local_all(states_all, discretize_actions)
                 experiences += (actions_next_local_all, )
 
                 # learn
-                agent.learn(experiences, agent.gamma, agent.tau)
+                agent.learn(experiences, agent.gamma, agent.tau, agent_index)
+                agent_index += 1
 
-    def act(self, states, add_noise=True):
-        actions = []
-        for i in range(len(self.agents)):
-            actions.append(self.agents[i].act(states[i], add_noise))
-        return np.asarray(actions)
+    def get_actions_next_target_all(self, states_all, discretize_actions):
+        actions_next_target_all = torch.Tensor().to(device)
+        agent_index = 0
+        for agent in self.agents:
+            for _ in range(agent.num_agents):
+                states_self = states_all.view(self.batch_size, self.num_all_agents, -1)[:,agent_index,:]
+                actions_next_self = agent.actor_target(states_self)
+                if discretize_actions:
+                    actions_next_self = torch.argmax(actions_next_self, dim=1, keepdim=True).float()
+                actions_next_target_all = torch.cat((actions_next_target_all, actions_next_self), dim=1)
+                agent_index += 1
+        return actions_next_target_all
+
+    def get_actions_next_local_all(self, states_all, discretize_actions):
+        actions_next_local_all = torch.Tensor().to(device)
+        agent_index = 0
+        for agent in self.agents:
+            for _ in range(agent.num_agents):
+                states_self = states_all.view(self.batch_size, self.num_all_agents, -1)[:,agent_index,:]
+                actions_next_self = agent.actor_local(states_self)
+                if discretize_actions:
+                    actions_next_self = torch.argmax(actions_next_self, dim=1, keepdim=True).float()
+                actions_next_local_all = torch.cat((actions_next_local_all, actions_next_self), dim=1)
+                agent_index += 1
+        return actions_next_local_all
+
+
+    def act(self, states, add_noise=True, discretize_actions=False):
+        actions_all = []
+        agent_index = 0
+        for agent in self.agents:
+            actions_of_agent = []
+            for _ in range(agent.num_agents):
+                action = agent.act(states[agent_index], add_noise)
+                if discretize_actions:
+                    action = np.argmax(action, axis=0)
+                actions_of_agent.append(action)
+                agent_index += 1
+            actions_all.append(np.stack(actions_of_agent))
+        return np.vstack(actions_all)
 
     def reset(self):
         for agent in self.agents:
